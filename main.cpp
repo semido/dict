@@ -1,25 +1,11 @@
-#ifndef _MSC_VER
-#include <signal.h>
-#endif
-
 #include <iostream>
 #include <filesystem>
 #include <array>
-//#include <unordered_map>
 #include "skarupke/bytell_hash_map.hpp" // https://github.com/skarupke/flat_hash_map
 #include <algorithm>
 #include <fstream>
 #include "file.hpp"
 #include "timer.hpp"
-
-inline void debugBreak()
-{
-#ifdef _MSC_VER
-	__debugbreak();
-#else
-	raise(SIGTRAP);
-#endif
-}
 
 using CharTable = std::array<unsigned char, 256>;
 
@@ -43,20 +29,21 @@ void makeDict(const std::string& in, const std::string& out)
 
   // this version still does not work on wins, because it shall open utf-8 txt to analize
 
-  FileReadBuf<unsigned char> f(in, 512 * 1024);
+  MMFileRead f(in);
+  unsigned char* ptr = (unsigned char*)f.ptr();
+  if (ptr == nullptr)
+    return;
 
   std::cout << "Load file: " << timer1 << "sec\n";
   timer1.reset();
 
   static constexpr auto proj = initProjection();
 
-  //std::unordered_map<std::string, unsigned> dict;
   ska::bytell_hash_map<std::string, unsigned> dict;
 
   std::string word;
-  unsigned char c0 = 0;
-  while(f.read(c0)) {
-    const auto c = proj[c0];
+  for (unsigned i = 0; i < f.size(); i++) {
+    const auto c = proj[ptr[i]];
     if (c == ' ') {
       if (word.empty())
         continue;
@@ -70,7 +57,6 @@ void makeDict(const std::string& in, const std::string& out)
   if (word.size())
     ++dict[word];
 
-  std::cout << "Spent in loading: " << f.mainWaits() << "sec\n";
   std::cout << "Fill dict: " << timer1 << "sec\n";
   timer1.reset();
 
@@ -98,10 +84,6 @@ void makeDict(const std::string& in, const std::string& out)
 
 int main(int argc, const char* argv[])
 {
-#ifdef _DEBUG
-  debugBreak();
-#endif
-
   Timer timer0;
 
   if (argc != 3) {
