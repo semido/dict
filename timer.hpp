@@ -7,6 +7,10 @@ public:
   typedef std::chrono::high_resolution_clock clock;
   Timer()
   {
+    reset();
+  }
+  void reset()
+  {
     t0 = clock::now();
   }
   operator double() const

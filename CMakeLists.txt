@@ -25,7 +25,7 @@ if(MSVC)
 #  add_compile_options("-Zc:__cplusplus")
 else()
   add_compile_options("-std=c++17")
-  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -pthread")
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -pthread -fpermissive")
 endif()
 
 include(FetchContent)

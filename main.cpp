@@ -5,10 +5,12 @@
 #include <iostream>
 #include <filesystem>
 #include <array>
-#include <unordered_map>
+//#include <unordered_map>
+#include "skarupke/bytell_hash_map.hpp" // https://github.com/skarupke/flat_hash_map
 #include <algorithm>
 #include <fstream>
 #include "file.hpp"
+#include "timer.hpp"
 
 inline void debugBreak()
 {
@@ -37,21 +39,24 @@ constexpr CharTable initProjection()
 
 void makeDict(const std::string& in, const std::string& out)
 {
-  // ??? next time use FileReadBuf<unsigned char> f(argv[1]);
-  // this version does not work on wins, because it shall open utf-8 txt to analize
-  File f(in, "rt"s);
-  auto sz = f.size();
-  std::vector<unsigned char> buf;
-  buf.resize(sz);
-  f.read(buf);
+  Timer timer1;
+
+  // this version still does not work on wins, because it shall open utf-8 txt to analize
+
+  FileReadBuf<unsigned char> f(in, 512 * 1024);
+
+  std::cout << "Load file: " << timer1 << "sec\n";
+  timer1.reset();
 
   static constexpr auto proj = initProjection();
 
-  std::unordered_map<std::string, unsigned> dict;
+  //std::unordered_map<std::string, unsigned> dict;
+  ska::bytell_hash_map<std::string, unsigned> dict;
 
   std::string word;
-  for (unsigned i = 0; i < buf.size(); i++) {
-    const auto c = proj[buf[i]];
+  unsigned char c0 = 0;
+  while(f.read(c0)) {
+    const auto c = proj[c0];
     if (c == ' ') {
       if (word.empty())
         continue;
@@ -65,6 +70,10 @@ void makeDict(const std::string& in, const std::string& out)
   if (word.size())
     ++dict[word];
 
+  std::cout << "Spent in loading: " << f.mainWaits() << "sec\n";
+  std::cout << "Fill dict: " << timer1 << "sec\n";
+  timer1.reset();
+
   std::vector<std::pair<unsigned, std::string_view>> frequencies;
   frequencies.reserve(dict.size());
   for (const auto& kv : dict) {
@@ -76,9 +85,15 @@ void makeDict(const std::string& in, const std::string& out)
     }
   );
 
+  std::cout << "Sort frequencies: " << timer1 << "sec\n";
+  timer1.reset();
+
   std::ofstream f2(out);
   for (const auto& fw : frequencies)
     f2 << fw.first << " " << fw.second << "\n";
+  f2.close();
+
+  std::cout << "Write output: " << timer1 << "sec\n";
 }
 
 int main(int argc, const char* argv[])
@@ -86,6 +101,8 @@ int main(int argc, const char* argv[])
 #ifdef _DEBUG
   debugBreak();
 #endif
+
+  Timer timer0;
 
   if (argc != 3) {
     std::cout << "Usage: " << argv[0] << " <in.txt> <out.txt>\n";
@@ -104,6 +121,7 @@ int main(int argc, const char* argv[])
   }
 
   makeDict(argv[1], argv[2]);
+  std::cout << "Total time: " << timer0 << "sec\n";
 
   return 0;
 }

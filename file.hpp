@@ -128,10 +128,12 @@ public:
       buf.clear();
       bufpos = 0;
       Timer timer;
-      wait([this] { return !doLoad; }); // continue to swap bufs when load is finished and flag is down
+      std::unique_lock<std::mutex> lock(m);
+      cv.wait(lock, [this] { return !doLoad; }); // continue to swap bufs when load is finished and flag is down
       if (isEOF)
         return false;
       std::swap(buf, buf2);
+      lock.unlock();
       setLoad(true);
       mainThreadWaits += timer;
     }
@@ -142,12 +144,6 @@ public:
   auto mainWaits() const { return mainThreadWaits; }
 
 private:
-  template <class Pred>
-  void wait(Pred pred)
-  {
-    std::unique_lock<std::mutex> lock(m);
-    cv.wait(lock, pred);
-  }
   void setLoad(bool b)
   {
     {
@@ -160,7 +156,9 @@ private:
   {
     while (true)
     {
-      wait([this] { return doLoad || isEOF; }); // continue to load when buf is ready and flag is raised
+      std::unique_lock<std::mutex> lock(m);
+      cv.wait(lock, [this] { return doLoad || isEOF; }); // continue to load when buf is ready and flag is raised
+      lock.unlock();
       if (isEOF)
         break;
       buf2.resize(buf2.capacity());
